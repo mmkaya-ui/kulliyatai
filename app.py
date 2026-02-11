@@ -90,7 +90,7 @@ if not os.environ["OPENAI_API_KEY"]:
 st.sidebar.title("🧠 Yapay Zeka Modeli")
 model_choice = st.sidebar.radio(
     "Zeka Seviyesini Seçin:",
-    ("⚡ Hızlı (Gemini Flash)", "🧠 Zeki (Gemini Pro)", "🧐 Derin (Claude 3.5 Sonnet)"),
+    ("⚡ Hızlı (Gemini Flash)", "🧠 Zeki (Gemini Pro)", "🧐 Derin (Claude 4.5 Sonnet)"),
     index=0
 )
 st.sidebar.divider()
@@ -135,7 +135,7 @@ elif "Zeki" in model_choice:
     k_val = 5
 else: # Claude 3.5
     llm = ChatOpenAI(
-        model="anthropic/claude-3.5-sonnet",
+        model="anthropic/claude-sonnet-4",
         openai_api_key=os.environ["OPENROUTER_API_KEY"],
         base_url="https://openrouter.ai/api/v1",
         default_headers={"HTTP-Referer": "http://localhost:8501"}
