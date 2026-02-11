@@ -4,7 +4,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains import RetrievalQA # <--- FIXED: Added missing import
+from langchain.chains import RetrievalQA
 
 # --- PASSWORD PROTECTION ---
 # This block stops the app from loading unless the user enters the correct password.
