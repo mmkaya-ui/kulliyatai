@@ -129,7 +129,7 @@ if "Hızlı" in model_choice:
     k_val = 3
 elif "Zeki" in model_choice:
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.5-pro-preview-05-06",
+        model="gemini-3.0-pro",
         temperature=0
     )
     k_val = 5
