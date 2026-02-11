@@ -90,7 +90,7 @@ if not os.environ["OPENAI_API_KEY"]:
 st.sidebar.title("🧠 Yapay Zeka Modeli")
 model_choice = st.sidebar.radio(
     "Zeka Seviyesini Seçin:",
-    ("⚡ Hızlı (Gemini Flash)", "🧠 Zeki (Gemini Pro)", "🧐 Derin (Claude 3.5)"),
+    ("⚡ Hızlı (Gemini Flash)", "🧠 Zeki (Gemini Pro)", "🧐 Derin (Claude 3.5 Sonnet)"),
     index=0
 )
 st.sidebar.divider()
@@ -121,7 +121,7 @@ except Exception as e:
 # 3. DYNAMIC AI SETUP
 if "Hızlı" in model_choice:
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash",
+        model="gemini-2.0-flash",
         temperature=0,
         max_tokens=None,
         max_retries=2,
@@ -129,7 +129,7 @@ if "Hızlı" in model_choice:
     k_val = 3
 elif "Zeki" in model_choice:
     llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-pro",
+        model="gemini-2.5-pro-preview-05-06",
         temperature=0
     )
     k_val = 5
