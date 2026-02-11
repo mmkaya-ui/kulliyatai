@@ -6,6 +6,8 @@ langchain-openai>=0.2.0
 langchain-google-genai>=2.0.0
 langsmith>=0.1.0
 faiss-cpu
+pymupdf
+rank-bm25
 pypdf
 python-dotenv
 tiktoken
