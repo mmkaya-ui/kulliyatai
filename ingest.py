@@ -1,5 +1,9 @@
 import os
+import sys
 import shutil
+
+# Fix Windows console encoding for Turkish characters
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 import fitz  # PyMuPDF — superior PDF text extraction
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
@@ -33,7 +37,8 @@ def load_pdfs_with_pymupdf(data_path):
         filepath = os.path.join(data_path, filename)
         try:
             doc = fitz.open(filepath)
-            for page_num in range(len(doc)):
+            num_pages = doc.page_count
+            for page_num in range(num_pages):
                 page = doc[page_num]
                 # Extract text with layout preservation
                 text = page.get_text("text")
@@ -44,13 +49,13 @@ def load_pdfs_with_pymupdf(data_path):
                         metadata={
                             "source": filename,
                             "page": page_num,
-                            "total_pages": len(doc)
+                            "total_pages": num_pages
                         }
                     ))
             doc.close()
-            print(f"  ✓ {filename} ({len(doc)} pages)")
+            print(f"  OK: {filename} ({num_pages} pages)")
         except Exception as e:
-            print(f"  ✗ {filename}: Error - {e}")
+            print(f"  FAIL: {filename}: Error - {e}")
     
     return documents
 
@@ -80,20 +85,20 @@ def create_vector_db():
     # Clear old database
     if os.path.exists(DB_PATH):
         shutil.rmtree(DB_PATH)
-        print(f"🗑️  Cleared old database at {DB_PATH}")
+        print(f"[CLEARED] Old database at {DB_PATH}")
 
     # --- Load PDFs with PyMuPDF ---
-    print(f"\n📄 Loading PDFs from '{DATA_PATH}'...")
+    print(f"\n[LOAD] Loading PDFs from '{DATA_PATH}'...")
     documents = load_pdfs_with_pymupdf(DATA_PATH)
     
     if not documents:
-        print("❌ No documents loaded!")
+        print("[ERROR] No documents loaded!")
         return
 
-    print(f"\n📊 Loaded {len(documents)} pages total.")
+    print(f"\n[INFO] Loaded {len(documents)} pages total.")
 
     # --- Smart Chunking (larger chunks, more overlap) ---
-    print("\n✂️  Splitting into chunks...")
+    print("\n[CHUNK] Splitting into chunks...")
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1500,       # Larger chunks = more context per retrieval
         chunk_overlap=300,     # More overlap = better continuity
@@ -104,12 +109,12 @@ def create_vector_db():
     print(f"   Created {len(chunks)} chunks.")
 
     # --- Contextual Enrichment ---
-    print("\n🏷️  Enriching chunks with source context...")
+    print("\n[ENRICH] Enriching chunks with source context...")
     enriched_chunks = enrich_chunks_with_context(chunks)
     print(f"   Enriched {len(enriched_chunks)} chunks.")
 
     # --- UPGRADE 3: Best Embedding Model ---
-    print("\n🧬 Generating embeddings with text-embedding-3-large (3072 dims)...")
+    print("\n[EMBED] Generating embeddings with text-embedding-3-large (3072 dims)...")
     print("   (This is the highest quality embedding model available)")
     embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
     
@@ -119,11 +124,11 @@ def create_vector_db():
     # Save locally
     db.save_local(DB_PATH)
     
-    print(f"\n✅ Success! Ultra-premium database saved to '{DB_PATH}'.")
-    print(f"   📦 {len(enriched_chunks)} enriched chunks")
-    print(f"   🧬 3072-dim embeddings (text-embedding-3-large)")
-    print(f"   📄 Parsed with PyMuPDF")
-    print(f"   🏷️  Context-enriched for smarter retrieval")
+    print(f"\n[SUCCESS] Ultra-premium database saved to '{DB_PATH}'.")
+    print(f"   {len(enriched_chunks)} enriched chunks")
+    print(f"   3072-dim embeddings (text-embedding-3-large)")
+    print(f"   Parsed with PyMuPDF")
+    print(f"   Context-enriched for smarter retrieval")
 
 
 if __name__ == "__main__":
