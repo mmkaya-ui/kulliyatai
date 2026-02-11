@@ -121,7 +121,7 @@ except Exception as e:
 # 3. DYNAMIC AI SETUP
 if "Hızlı" in model_choice:
     llm = ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash-preview-04-17",
         temperature=0,
         max_tokens=None,
         max_retries=2,
