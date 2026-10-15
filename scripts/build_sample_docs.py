@@ -17,9 +17,9 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
 import urllib.parse
 import urllib.request
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fpdf import FPDF
@@ -137,7 +137,7 @@ class _PDF(FPDF):
 
 def render_pdf(title: str, body: str, out: Path, font: str) -> int:
     pdf = _PDF(format="A4")
-    pdf.set_creation_date(datetime(2000, 1, 1, tzinfo=timezone.utc))  # deterministic output
+    pdf.set_creation_date(datetime(2000, 1, 1, tzinfo=UTC))  # deterministic output
     pdf.set_title(title)
     pdf.add_font("body", fname=font)
     pdf.set_auto_page_break(auto=True, margin=18)

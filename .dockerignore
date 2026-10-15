@@ -1,0 +1,15 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+my_pdfs
+vector_db_private
+evals/.cache
+.env
+.streamlit/secrets.toml

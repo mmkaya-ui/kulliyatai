@@ -39,5 +39,6 @@ my_pdfs/
 
 # Generated artifacts (rebuild with `make ingest`)
 vector_db/
+vector_db_*/
 evals/.cache/
 .ruff_cache/
