@@ -1,33 +1,53 @@
-"""Retrieval: dense (FAISS), sparse (BM25), Reciprocal Rank Fusion, optional reranking.
+"""Retrieval: dense (FAISS), sparse (BM25), Reciprocal Rank Fusion, cross-encoder reranking.
 
-The original app used LangChain's ``EnsembleRetriever`` (weighted RRF over a
-FAISS and a BM25 retriever). This module implements the same fusion formula
-explicitly so that it is unit-testable, and so the evals can switch between
-``dense`` / ``bm25`` / ``hybrid`` / ``hybrid + rerank`` with identical code.
+``Retriever.search`` is the single entry point used by the app, ingest checks
+and the evals, so the evaluated pipeline is the code that serves users. It
+returns :class:`Hit` objects and, if asked, a per-stage latency breakdown.
 """
 
 from __future__ import annotations
 
 import re
+import time
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 
+import numpy as np
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 
-from rag.chunking import strip_context_header
+from rag.embeddings import Embedder
+from rag.index import RAGIndex
 
-RRF_K = 60  # standard RRF constant (also LangChain EnsembleRetriever's default)
+RRF_K = 60  # standard RRF constant (Cormack et al., SIGIR 2009)
+MODES = ("dense", "bm25", "hybrid")
 
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
 
-def tokenize(text: str) -> list[str]:
-    """Lower-case word tokenizer for BM25 that works for TR / EN / DE.
+def tokenize(text: str, mode: str = "plain") -> list[str]:
+    """Lower-case word tokens for BM25 (TR / EN / DE).
 
-    ``str.casefold`` handles German ß -> ss. Turkish dotted capital İ is mapped
-    to i first (``"İ".lower()`` would otherwise yield "i̇" with a combining dot).
+    ``mode``:
+      * ``"plain"``   – whole words.
+      * ``"prefixN"`` – words truncated to their first N characters: a crude,
+        language-independent stemmer for agglutinative Turkish
+        ("Meclisinde" -> "mecli"). Can et al. (JASIST 59(3), 2008) found that
+        simple word truncation is about as effective as a lemmatizer-based
+        stemmer for Turkish IR. Whether it helps on this mixed TR/EN/DE
+        corpus is measured in ``evals/``, not assumed.
+
+    ``str.casefold`` maps German ß -> ss; Turkish dotted capital İ is mapped to
+    i first (``"İ".lower()`` would give "i̇" with a combining dot).
     """
-    return _TOKEN_RE.findall(text.replace("İ", "i").casefold())
+    tokens = _TOKEN_RE.findall(text.replace("İ", "i").casefold())
+    if mode == "plain":
+        return tokens
+    m = re.fullmatch(r"prefix(\d+)", mode)
+    if not m:
+        raise ValueError(f"unknown tokenizer mode {mode!r}")
+    n = int(m.group(1))
+    return [t[:n] for t in tokens]
 
 
 def rrf_fuse(
@@ -35,22 +55,19 @@ def rrf_fuse(
     weights: Sequence[float] | None = None,
     k: int = RRF_K,
 ) -> list[tuple[str, float]]:
-    """Weighted Reciprocal Rank Fusion.
+    """Weighted Reciprocal Rank Fusion: ``score(d) = sum_i w_i / (k + rank_i(d))``.
 
-    ``score(d) = sum_i  w_i / (k + rank_i(d))`` with 1-based ranks; documents
-    missing from a ranking contribute nothing for it. Only ranks matter, not
-    raw scores, which is why RRF can merge BM25 scores (unbounded) with
-    cosine similarities (bounded) without any normalisation.
-
-    Returns ``(id, score)`` sorted by score descending; ties keep the order of
-    first appearance (deterministic).
+    Ranks are 1-based; a document missing from a ranking contributes nothing
+    for it. Only ranks matter, which is why RRF can merge unbounded BM25
+    scores with cosine similarities without normalisation. Ties keep the
+    order of first appearance (deterministic).
     """
     if weights is None:
         weights = [1.0] * len(rankings)
     if len(weights) != len(rankings):
         raise ValueError("weights and rankings must have the same length")
     scores: dict[str, float] = {}
-    for ranking, w in zip(rankings, weights, strict=False):
+    for ranking, w in zip(rankings, weights, strict=True):
         seen = set()
         for rank, doc_id in enumerate(ranking, start=1):
             if doc_id in seen:  # ignore duplicates inside one ranking
@@ -61,90 +78,113 @@ def rrf_fuse(
     return sorted(scores.items(), key=lambda kv: (-kv[1], order[kv[0]]))
 
 
-def doc_id(doc: Document) -> str:
-    return doc.metadata.get("chunk_id") or doc.page_content
-
-
 class Reranker:
-    """Cross-encoder reranker (fastembed / ONNX, runs on CPU). Optional dependency."""
+    """Multilingual cross-encoder via FastEmbed (ONNX, CPU)."""
 
-    def __init__(self, model_name: str = "BAAI/bge-reranker-v2-m3-int8"):
-        try:
-            from fastembed.rerank.cross_encoder import TextCrossEncoder
-        except ImportError as e:  # pragma: no cover - depends on optional package
-            raise ImportError(
-                "Reranking needs the optional 'fastembed' package: pip install fastembed"
-            ) from e
+    def __init__(self, model_name: str = "BAAI/bge-reranker-v2-m3-int8", batch_size: int = 16):
+        from fastembed.rerank.cross_encoder import TextCrossEncoder
+
         self.model_name = model_name
+        self.batch_size = batch_size
         self._model = TextCrossEncoder(model_name=model_name)
 
     def score(self, query: str, texts: list[str]) -> list[float]:
-        return [float(s) for s in self._model.rerank(query, texts, batch_size=16)]
-
-    def rerank(self, query: str, docs: list[Document], top_k: int) -> list[Document]:
-        if not docs:
+        if not texts:
             return []
-        scores = self.score(query, [d.page_content for d in docs])
-        ranked = sorted(zip(docs, scores, strict=False), key=lambda x: -x[1])
-        return [d for d, _ in ranked[:top_k]]
+        return [float(s) for s in self._model.rerank(query, texts, batch_size=self.batch_size)]
 
 
-class HybridRetriever:
-    """Dense + BM25 retrieval over the chunks stored in a LangChain vector store.
+@dataclass
+class Hit:
+    chunk: Document
+    score: float  # dense cosine, BM25 score, RRF score or reranker logit, depending on the last stage
+    rerank_score: float | None = None
 
-    BM25 indexes the chunk text **without** the ``[Kaynak: … | Sayfa: …]``
-    enrichment header, so file names and the word "Sayfa" don't add noise to
-    keyword matching. The dense side embeds the enriched text.
-    """
 
+@dataclass
+class SearchTrace:
+    timings_ms: dict[str, float] = field(default_factory=dict)
+
+    def add(self, stage: str, t0: float) -> None:
+        self.timings_ms[stage] = self.timings_ms.get(stage, 0.0) + (time.perf_counter() - t0) * 1000
+
+
+class Retriever:
     def __init__(
         self,
-        vectorstore,
-        documents: list[Document] | None = None,
-        dense_weight: float = 0.6,
-        bm25_weight: float = 0.4,
+        index: RAGIndex,
+        embedder: Embedder,
+        *,
+        dense_weight: float = 1.0,
+        bm25_weight: float = 1.0,
         candidate_k: int = 20,
         reranker: Reranker | None = None,
     ):
-        self.vectorstore = vectorstore
-        if documents is None:
-            # Extract all documents from FAISS for BM25 indexing
-            documents = list(vectorstore.docstore._dict.values())
-        if not documents:
-            raise ValueError("No documents to index")
-        self.documents = documents
-        self._by_id = {doc_id(d): d for d in documents}
-        self._bm25 = BM25Okapi([tokenize(strip_context_header(d.page_content)) or [""] for d in documents])
+        if embedder.name != index.embedder_name:
+            raise ValueError(f"index built with {index.embedder_name}, query embedder is {embedder.name}")
+        self.index = index
+        self.embedder = embedder
         self.dense_weight = dense_weight
         self.bm25_weight = bm25_weight
         self.candidate_k = candidate_k
         self.reranker = reranker
+        mode = index.settings.bm25_tokenizer
+        self._bm25_mode = mode
+        self._bm25 = BM25Okapi([tokenize(self._text(c), mode) or [""] for c in index.chunks])
 
-    def dense(self, query: str, k: int) -> list[Document]:
-        return self.vectorstore.similarity_search(query, k=k)
+    def _text(self, chunk: Document) -> str:
+        return RAGIndex.index_text(chunk, self.index.settings)
 
-    def bm25(self, query: str, k: int) -> list[Document]:
-        tokens = tokenize(query)
-        if not tokens:
-            return []
-        scores = self._bm25.get_scores(tokens)
-        top = sorted(range(len(scores)), key=lambda i: -scores[i])[:k]
-        return [self.documents[i] for i in top if scores[i] > 0]
+    # --- single retrievers: return [(chunk_index, score)] ------------------
 
-    def hybrid(self, query: str, k: int) -> list[Document]:
+    def _dense(self, query: str, k: int, trace: SearchTrace) -> list[tuple[int, float]]:
+        t0 = time.perf_counter()
+        qv = self.embedder.embed_query(query)
+        trace.add("embed_query", t0)
+        t0 = time.perf_counter()
+        out = self.index.dense_search(qv, k)
+        trace.add("dense_search", t0)
+        return out
+
+    def _bm25_search(self, query: str, k: int, trace: SearchTrace) -> list[tuple[int, float]]:
+        t0 = time.perf_counter()
+        tokens = tokenize(query, self._bm25_mode)
+        out: list[tuple[int, float]] = []
+        if tokens:
+            scores = self._bm25.get_scores(tokens)
+            top = np.argsort(-scores, kind="stable")[:k]
+            out = [(int(i), float(scores[i])) for i in top if scores[i] > 0]
+        trace.add("bm25", t0)
+        return out
+
+    def _first_stage(self, query: str, k: int, mode: str, trace: SearchTrace) -> list[tuple[int, float]]:
+        if mode == "dense":
+            return self._dense(query, k, trace)
+        if mode == "bm25":
+            return self._bm25_search(query, k, trace)
         n = max(k, self.candidate_k)
-        dense_ids = [doc_id(d) for d in self.dense(query, n)]
-        bm25_ids = [doc_id(d) for d in self.bm25(query, n)]
-        fused = rrf_fuse([dense_ids, bm25_ids], [self.dense_weight, self.bm25_weight])
-        return [self._by_id[i] for i, _ in fused[:k] if i in self._by_id]
+        dense = self._dense(query, n, trace)
+        sparse = self._bm25_search(query, n, trace)
+        t0 = time.perf_counter()
+        fused = rrf_fuse(
+            [[str(i) for i, _ in dense], [str(i) for i, _ in sparse]], [self.dense_weight, self.bm25_weight]
+        )
+        trace.add("fusion", t0)
+        return [(int(i), s) for i, s in fused[:k]]
 
-    def retrieve(self, query: str, k: int, mode: str = "hybrid", rerank: bool = False) -> list[Document]:
-        if mode not in {"dense", "bm25", "hybrid"}:
-            raise ValueError(f"unknown mode {mode!r}")
-        search = getattr(self, mode)
+    def search(
+        self, query: str, k: int = 5, mode: str = "hybrid", rerank: bool = False, trace: SearchTrace | None = None
+    ) -> list[Hit]:
+        if mode not in MODES:
+            raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
+        trace = trace if trace is not None else SearchTrace()
         if not rerank:
-            return search(query, k)
+            return [Hit(self.index.chunks[i], s) for i, s in self._first_stage(query, k, mode, trace)]
         if self.reranker is None:
             raise ValueError("rerank=True but no reranker configured")
-        candidates = search(query, max(k, self.candidate_k))
-        return self.reranker.rerank(query, candidates, top_k=k)
+        cands = self._first_stage(query, max(k, self.candidate_k), mode, trace)
+        t0 = time.perf_counter()
+        scores = self.reranker.score(query, [self._text(self.index.chunks[i]) for i, _ in cands])
+        trace.add("rerank", t0)
+        order = sorted(range(len(cands)), key=lambda j: -scores[j])[:k]
+        return [Hit(self.index.chunks[cands[j][0]], scores[j], scores[j]) for j in order]

@@ -1,8 +1,9 @@
-"""Chunking and contextual enrichment."""
+"""Chunking, contextual headers and embedding windows."""
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -13,34 +14,32 @@ SEPARATORS = ["\n\n", "\n", ". ", " ", ""]
 _HEADER_RE = re.compile(r"^\[Kaynak: [^\]\n]*\]\n")
 
 
-def split_documents(
-    documents: list[Document], chunk_size: int = 1500, chunk_overlap: int = 300
-) -> list[Document]:
+def split_documents(documents: list[Document], chunk_size: int = 1000, chunk_overlap: int = 150) -> list[Document]:
     """Split page documents into overlapping character chunks.
 
     - Sizes are in characters (``length_function=len``), not tokens.
     - Pages are split independently, so a chunk never spans two pages; that
       keeps page citations exact.
     - Whitespace-only chunks are dropped.
-    - Each chunk gets ``start_index`` (offset in its page) and a stable
-      ``chunk_id`` = ``"<source>:p<page>:<start_index>"``.
+    - Each chunk gets ``start_index`` (offset in its page), ``chunk_chars``
+      and a stable ``chunk_id`` = ``"<source>:p<page>:<start_index>"``.
     """
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
     if not 0 <= chunk_overlap < chunk_size:
         raise ValueError("chunk_overlap must be >= 0 and smaller than chunk_size")
 
-    # --- Smart Chunking (larger chunks, more overlap) ---
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=chunk_size,  # Larger chunks = more context per retrieval
-        chunk_overlap=chunk_overlap,  # More overlap = better continuity
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
         length_function=len,
-        separators=SEPARATORS,  # Respect paragraph boundaries
+        separators=SEPARATORS,
         add_start_index=True,
     )
-    chunks = [c for c in text_splitter.split_documents(documents) if c.page_content.strip()]
+    chunks = [c for c in splitter.split_documents(documents) if c.page_content.strip()]
     for c in chunks:
         m = c.metadata
+        m["chunk_chars"] = len(c.page_content)
         m["chunk_id"] = f"{m.get('source', '?')}:p{m.get('page', '?')}:{m.get('start_index', 0)}"
     return chunks
 
@@ -51,26 +50,43 @@ def context_header(metadata: dict) -> str:
     return f"[Kaynak: {source} | Sayfa: {page}]"
 
 
-# --- UPGRADE 2: Contextual Chunk Enrichment ---
-# Prepends source metadata INTO each chunk before embedding
-# This makes retrieval smarter — the AI knows WHERE info came from
-def enrich_chunks_with_context(chunks: list[Document]) -> list[Document]:
-    """Add source context directly into chunk text for better retrieval."""
-    enriched = []
-    for chunk in chunks:
-        # Prepend context header to the actual text
-        enriched_content = f"{context_header(chunk.metadata)}\n{chunk.page_content}"
-
-        enriched.append(
-            Document(
-                page_content=enriched_content,
-                metadata=dict(chunk.metadata),  # Keep original metadata too
-            )
-        )
-
-    return enriched
+def with_header(chunk: Document) -> str:
+    """Chunk text prefixed with its ``[Kaynak: … | Sayfa: …]`` header."""
+    return f"{context_header(chunk.metadata)}\n{chunk.page_content}"
 
 
 def strip_context_header(text: str) -> str:
-    """Inverse of :func:`enrich_chunks_with_context` for a single chunk text."""
+    """Remove a leading ``[Kaynak: … | Sayfa: …]`` header line, if present."""
     return _HEADER_RE.sub("", text, count=1)
+
+
+def token_windows(
+    text: str, count_tokens: Callable[[str], int], max_tokens: int, stride_ratio: float = 0.5
+) -> list[str]:
+    """Cut ``text`` into word-aligned windows of at most ``max_tokens`` tokens.
+
+    Consecutive windows start ``stride_ratio`` of a window apart, so every
+    sentence is fully contained in at least one window unless it is longer
+    than a window. Used to embed chunks that exceed the embedding model's
+    input limit (see :mod:`rag.index`): the chunk's dense score is the max over
+    its windows ("MaxP", Dai & Callan, SIGIR 2019).
+    """
+    words = text.split()
+    if not words:
+        return []
+    if count_tokens(text) <= max_tokens:
+        return [" ".join(words)]
+    windows, i = [], 0
+    while i < len(words):
+        lo, hi = i + 1, len(words)
+        while lo < hi:  # largest end index whose window fits
+            mid = (lo + hi + 1) // 2
+            if count_tokens(" ".join(words[i:mid])) <= max_tokens:
+                lo = mid
+            else:
+                hi = mid - 1
+        windows.append(" ".join(words[i:lo]))
+        if lo >= len(words):
+            break
+        i += max(1, int((lo - i) * stride_ratio))
+    return windows

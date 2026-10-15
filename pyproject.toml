@@ -1,12 +1,12 @@
 [project]
 name = "kulliyatai"
-version = "0.2.0"
-description = "High-fidelity RAG pipeline with multilingual hybrid search, benchmark evaluations, and Streamlit UI"
+version = "0.3.0"
+description = "Multilingual (TR/EN/DE) hybrid RAG over PDFs with a machine-verified, statistically reported benchmark"
 readme = "README.md"
 requires-python = ">=3.11"
 
 [tool.ruff]
-line-length = 110
+line-length = 120
 target-version = "py311"
 
 [tool.ruff.lint]
@@ -19,12 +19,17 @@ select = [
     "UP",  # pyupgrade
 ]
 ignore = [
-    "E501",  # line too long (handled by formatter)
-    "B008",  # do not perform function calls in argument defaults
+    "E501",  # line length is handled by the formatter
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
-pythonpath = ["."]
+pythonpath = [".", "tests"]
 addopts = "-v --strict-markers"
+markers = ["models: needs the local FastEmbed models (set RUN_MODEL_TESTS=1)"]
+filterwarnings = [
+    # faiss' SWIG bindings on Python >= 3.12
+    "ignore:builtin type Swig.*has no __module__ attribute:DeprecationWarning",
+    "ignore:builtin type swigvarlink has no __module__ attribute:DeprecationWarning",
+]

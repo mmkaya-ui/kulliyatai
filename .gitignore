@@ -1,44 +1,28 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
+*.py[cod]
+.venv/
 venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage*
 *.log
-.git
-.mypy_cache
-.pytest_cache
-.hypotheses
 
-# Streamlit
+# Secrets
+.env
 .streamlit/secrets.toml
 
-# Environment Variables
-.env
-
-# MacOS
+# OS
 .DS_Store
-
-# Virtual Environment
-venv
-.venv/
+Thumbs.db
 
 # Private corpus (copyrighted, not redistributable) — keep locally only
 my_pdfs/
 
-# Generated artifacts (rebuild with `make ingest`)
+# Generated artifacts (rebuild with `make ingest`; caches with `make eval`)
 vector_db/
 vector_db_*/
+.index_tmp_*/
 evals/.cache/
-.ruff_cache/
