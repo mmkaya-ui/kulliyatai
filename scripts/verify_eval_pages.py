@@ -67,7 +67,6 @@ QUESTIONS = [
         "needs_human_review": False,
         "is_unanswerable": False,
     },
-
     # --- tr_omer_seyfettin_hikayeler.pdf (9 pages) ---
     {
         "id": "q07",
@@ -129,7 +128,6 @@ QUESTIONS = [
         "needs_human_review": True,
         "is_unanswerable": False,
     },
-
     # --- en_us_constitution.pdf (9 pages) ---
     {
         "id": "q13",
@@ -191,7 +189,6 @@ QUESTIONS = [
         "needs_human_review": False,
         "is_unanswerable": False,
     },
-
     # --- en_scandal_in_bohemia.pdf (16 pages) ---
     {
         "id": "q19",
@@ -253,7 +250,6 @@ QUESTIONS = [
         "needs_human_review": True,
         "is_unanswerable": False,
     },
-
     # --- de_kafka_die_verwandlung.pdf (29 pages) ---
     {
         "id": "q25",
@@ -315,7 +311,6 @@ QUESTIONS = [
         "needs_human_review": True,
         "is_unanswerable": False,
     },
-
     # --- 5 UNANSWERABLE QUESTIONS (Refusal tests) ---
     {
         "id": "u01",
@@ -369,6 +364,7 @@ QUESTIONS = [
     },
 ]
 
+
 def main():
     out_file = ROOT / "evals" / "questions.jsonl"
     out_file.parent.mkdir(exist_ok=True)
@@ -376,6 +372,7 @@ def main():
         for q in QUESTIONS:
             f.write(json.dumps(q, ensure_ascii=False) + "\n")
     print(f"Successfully generated {len(QUESTIONS)} questions in {out_file}")
+
 
 if __name__ == "__main__":
     main()

@@ -11,24 +11,22 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import time
-from pathlib import Path
 from typing import Any
 
-from rag.chunking import enrich_chunks_with_context, split_documents
-from rag.config import DEFAULT_EMBEDDING_MODELS, ROOT, Settings, load_dotenv_if_available
-from rag.embeddings import CachedEmbeddings, make_embeddings
-from rag.index import build_faiss
-from rag.loading import load_pdfs_with_pymupdf
-from rag.prompts import NO_ANSWER, REFUSAL_MESSAGES, build_prompt
-from rag.retrieval import HybridRetriever, Reranker
 from evals.metrics import (
     evaluate_citation_correctness_heuristic,
     hit_at_k,
     is_refusal,
     reciprocal_rank,
 )
+from rag.chunking import enrich_chunks_with_context, split_documents
+from rag.config import ROOT, Settings, load_dotenv_if_available
+from rag.embeddings import CachedEmbeddings, make_embeddings
+from rag.index import build_faiss
+from rag.loading import load_pdfs_with_pymupdf
+from rag.prompts import NO_ANSWER, build_prompt
+from rag.retrieval import HybridRetriever, Reranker
 
 load_dotenv_if_available()
 EVALS_DIR = ROOT / "evals"
@@ -138,7 +136,9 @@ def run_benchmark():
     unanswerable = [q for q in questions if q.get("is_unanswerable")]
 
     print(f"Loaded {len(docs)} document pages.")
-    print(f"Loaded {len(questions)} evaluation questions ({len(answerable)} answerable, {len(unanswerable)} unanswerable).")
+    print(
+        f"Loaded {len(questions)} evaluation questions ({len(answerable)} answerable, {len(unanswerable)} unanswerable)."
+    )
 
     # 2. Main Retrieval Benchmark (Chunk Size = 1500, Overlap = 300)
     print("\n[STEP 1/3] Benchmarking Retrieval Architectures on Baseline (1500 chars)...")
@@ -198,6 +198,7 @@ def run_benchmark():
     if os.environ.get("GOOGLE_API_KEY"):
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
+
             llm = ChatGoogleGenerativeAI(model="gemini-3.5-flash", temperature=0, max_retries=2)
             print("Using Google Gemini 3.5 Flash for generation evaluation.")
         except Exception as e:
@@ -205,6 +206,7 @@ def run_benchmark():
     elif os.environ.get("OPENAI_API_KEY"):
         try:
             from langchain_openai import ChatOpenAI
+
             llm = ChatOpenAI(model="gpt-4o-mini", temperature=0)
             print("Using OpenAI gpt-4o-mini for generation evaluation.")
         except Exception as e:
@@ -229,13 +231,15 @@ def run_benchmark():
                 ans = chain.invoke({"p": prompt_str}).strip()
                 refused = is_refusal(ans) or NO_ANSWER in ans or "bulunamadı" in ans.lower()
                 refusal_scores.append(1.0 if refused else 0.0)
-                generation_samples.append({
-                    "id": uq["id"],
-                    "question": uq["question"],
-                    "answer": ans,
-                    "expected_refusal": True,
-                    "refusal_detected": refused
-                })
+                generation_samples.append(
+                    {
+                        "id": uq["id"],
+                        "question": uq["question"],
+                        "answer": ans,
+                        "expected_refusal": True,
+                        "refusal_detected": refused,
+                    }
+                )
             except Exception as e:
                 print(f"Error generating for {uq['id']}: {e}")
 
@@ -248,21 +252,21 @@ def run_benchmark():
                 ans = chain.invoke({"p": prompt_str}).strip()
                 cite_res = evaluate_citation_correctness_heuristic(ans, retrieved)
                 citation_evals.append(cite_res)
-                generation_samples.append({
-                    "id": aq["id"],
-                    "question": aq["question"],
-                    "answer": ans,
-                    "expected_refusal": False,
-                    "citation_accuracy": cite_res["accuracy"],
-                    "citations_count": cite_res["total_citations"]
-                })
+                generation_samples.append(
+                    {
+                        "id": aq["id"],
+                        "question": aq["question"],
+                        "answer": ans,
+                        "expected_refusal": False,
+                        "citation_accuracy": cite_res["accuracy"],
+                        "citations_count": cite_res["total_citations"],
+                    }
+                )
             except Exception as e:
                 print(f"Error generating for {aq['id']}: {e}")
 
     refusal_rate = (sum(refusal_scores) / len(refusal_scores)) if refusal_scores else 1.0
-    avg_cite_acc = (
-        sum(c["accuracy"] for c in citation_evals) / len(citation_evals) if citation_evals else 1.0
-    )
+    avg_cite_acc = sum(c["accuracy"] for c in citation_evals) / len(citation_evals) if citation_evals else 1.0
 
     print(f"\nRefusal Accuracy on Unanswerable Queries: {refusal_rate * 100:.1f}%")
     if citation_evals:
@@ -292,44 +296,66 @@ def write_results_markdown(
 ):
     md = []
     md.append("# RAG Retrieval & Generation Benchmark Results")
-    md.append("\n*All metrics in this report were generated empirically by running `make eval` (`python -m evals.run_evals`). No numbers are fabricated.*")
+    md.append(
+        "\n*All metrics in this report were generated empirically by running `make eval` (`python -m evals.run_evals`). No numbers are fabricated.*"
+    )
     md.append(f"\n- **Generated At:** {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}")
     md.append(f"- **Embedding Model:** `{settings.embedding_provider}` / `{settings.embedding_model}`")
     md.append(f"- **Reranker Model:** `{settings.rerank_model}` (Apache-2.0, ONNX)")
     md.append(f"- **Embedding Cache:** {cache_stats[0]} cache hits, {cache_stats[1]} new embeddings computed")
-    md.append("- **Evaluation Dataset:** 35 questions total (30 answerable across TR/EN/DE public domain PDFs + 5 unanswerable refusal tests)")
+    md.append(
+        "- **Evaluation Dataset:** 35 questions total (30 answerable across TR/EN/DE public domain PDFs + 5 unanswerable refusal tests)"
+    )
 
     md.append("\n## 1. Retrieval Strategy Comparison")
     md.append("\nEvaluating top-5 candidate retrieval across 30 answerable multi-document questions:")
     md.append("\n| Method | Hit@1 | Hit@3 | Hit@5 | MRR | Mean Latency |")
     md.append("|---|---|---|---|---|---|")
     for method, m in retrieval_results.items():
-        md.append(f"| **{method}** | {m['hit@1']:.3f} | {m['hit@3']:.3f} | {m['hit@5']:.3f} | {m['mrr']:.3f} | {m['latency_ms']:.1f} ms |")
+        md.append(
+            f"| **{method}** | {m['hit@1']:.3f} | {m['hit@3']:.3f} | {m['hit@5']:.3f} | {m['mrr']:.3f} | {m['latency_ms']:.1f} ms |"
+        )
 
     md.append("\n### Analysis of Retrieval Fusion & Reranking:")
     dense_h1 = retrieval_results.get("Dense Only (FAISS)", {}).get("hit@1", 0)
     hyb_h1 = retrieval_results.get("Hybrid (Dense + BM25 RRF)", {}).get("hit@1", 0)
     rerank_h1 = retrieval_results.get("Hybrid + Cross-Encoder Rerank", {}).get("hit@1", 0)
 
-    md.append(f"- **Dense Search Baseline:** Achieved Hit@1 of {dense_h1:.1%} and MRR of {retrieval_results.get('Dense Only (FAISS)', {}).get('mrr', 0):.3f}.")
-    md.append(f"- **Hybrid Search (BM25 + Dense RRF):** Achieved Hit@1 of {hyb_h1:.1%}. Reciprocal Rank Fusion successfully boosts exact term matches (such as legal article numbers *'Madde 1'* and character names *'Dadaruh'*, *'Irene Adler'*).")
-    md.append(f"- **Cross-Encoder Reranking:** Achieved Hit@1 of {rerank_h1:.1%}. The cross-encoder directly attends to the full query-document token cross-attention, further refining top-1 precision.")
+    md.append(
+        f"- **Dense Search Baseline:** Achieved Hit@1 of {dense_h1:.1%} and MRR of {retrieval_results.get('Dense Only (FAISS)', {}).get('mrr', 0):.3f}."
+    )
+    md.append(
+        f"- **Hybrid Search (BM25 + Dense RRF):** Achieved Hit@1 of {hyb_h1:.1%}. Reciprocal Rank Fusion successfully boosts exact term matches (such as legal article numbers *'Madde 1'* and character names *'Dadaruh'*, *'Irene Adler'*)."
+    )
+    md.append(
+        f"- **Cross-Encoder Reranking:** Achieved Hit@1 of {rerank_h1:.1%}. The cross-encoder directly attends to the full query-document token cross-attention, further refining top-1 precision."
+    )
 
     md.append("\n## 2. Chunk-Size Ablation")
-    md.append("\nEvaluating retrieval accuracy and corpus granularity across 3 different chunk sizes (Hybrid Search):")
+    md.append(
+        "\nEvaluating retrieval accuracy and corpus granularity across 3 different chunk sizes (Hybrid Search):"
+    )
     md.append("\n| Chunk Configuration | Total Chunks | Hit@1 | Hit@3 | Hit@5 | MRR |")
     md.append("|---|---|---|---|---|---|")
     for label, m in ablation_results.items():
-        md.append(f"| **{label}** | {m['total_chunks']} | {m['hit@1']:.3f} | {m['hit@3']:.3f} | {m['hit@5']:.3f} | {m['mrr']:.3f} |")
+        md.append(
+            f"| **{label}** | {m['total_chunks']} | {m['hit@1']:.3f} | {m['hit@3']:.3f} | {m['hit@5']:.3f} | {m['mrr']:.3f} |"
+        )
 
     md.append("\n### Trade-Off Discussion:")
-    md.append("- **Small chunks (500 chars):** Produce finer granularity and more precise semantic fragments, but risk splitting critical co-references (e.g. the subject in paragraph 1 and the action in paragraph 2) across chunk boundaries.")
-    md.append("- **Large chunks (1500 chars):** Preserve complete paragraphs, legal articles, and conversational context intact, providing higher semantic completeness for generation while keeping the total index size compact.")
+    md.append(
+        "- **Small chunks (500 chars):** Produce finer granularity and more precise semantic fragments, but risk splitting critical co-references (e.g. the subject in paragraph 1 and the action in paragraph 2) across chunk boundaries."
+    )
+    md.append(
+        "- **Large chunks (1500 chars):** Preserve complete paragraphs, legal articles, and conversational context intact, providing higher semantic completeness for generation while keeping the total index size compact."
+    )
 
     md.append("\n## 3. Answer Quality, Citations, and Refusals")
     md.append(f"- **Refusal Accuracy on Unanswerable Questions:** `{refusal_rate * 100:.1f}%` (Target: 100%)")
     md.append(f"- **Citation Support Rate:** `{avg_cite_acc * 100:.1f}%`")
-    md.append("- **Refusal Mechanism:** When context lacks the required claim, the prompt explicitly instructs the LLM to output `NO_ANSWER`, which prevents confident hallucinations on anachronisms or out-of-corpus queries.")
+    md.append(
+        "- **Refusal Mechanism:** When context lacks the required claim, the prompt explicitly instructs the LLM to output `NO_ANSWER`, which prevents confident hallucinations on anachronisms or out-of-corpus queries."
+    )
 
     md.append("\n## 4. Failure Analysis & Boundary Cases")
     failures = retrieval_results.get("Hybrid + Cross-Encoder Rerank", {}).get("failures", [])
@@ -339,17 +365,25 @@ def write_results_markdown(
     if failures:
         md.append("\nSelected queries where Hit@1 was not achieved:")
         for fail in failures[:5]:
-            md.append(f"- **Query [{fail['id']}]:** *\"{fail['question']}\"*")
+            md.append(f'- **Query [{fail["id"]}]:** *"{fail["question"]}"*')
             md.append(f"  - **Expected Location:** `{fail['expected']}`")
             md.append(f"  - **Top Retrieved Chunk:** `{fail['top_retrieved']}`")
-            md.append("  - **Root Cause:** Term dilution or shared terminology across adjacent story chapters/articles.")
+            md.append(
+                "  - **Root Cause:** Term dilution or shared terminology across adjacent story chapters/articles."
+            )
     else:
         md.append("\nAll evaluated queries successfully placed the expected document and page in top-1!")
 
     md.append("\n## 5. LLM-as-a-Judge Evaluation Prompts")
-    md.append("The repository contains the exact judge prompt templates under [`evals/judge_prompts.py`](./judge_prompts.py):")
-    md.append("- `FAITHFULNESS_JUDGE_PROMPT`: 1–5 scoring scale checking factual support against retrieved context.")
-    md.append("- `CITATION_VERIFIER_PROMPT`: Boolean verification per cited chunk `[N]` confirming claim presence.")
+    md.append(
+        "The repository contains the exact judge prompt templates under [`evals/judge_prompts.py`](./judge_prompts.py):"
+    )
+    md.append(
+        "- `FAITHFULNESS_JUDGE_PROMPT`: 1–5 scoring scale checking factual support against retrieved context."
+    )
+    md.append(
+        "- `CITATION_VERIFIER_PROMPT`: Boolean verification per cited chunk `[N]` confirming claim presence."
+    )
 
     RESULTS_FILE.write_text("\n".join(md), encoding="utf-8")
 

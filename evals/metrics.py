@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from typing import Any
+
 from langchain_core.documents import Document
 
 from rag.chunking import strip_context_header
-from rag.prompts import NO_ANSWER, is_refusal, parse_citations, split_claims
+from rag.prompts import NO_ANSWER, is_refusal, split_claims
 
 
 def doc_matches(doc: Document, expected_doc: str, expected_pages: list[int]) -> bool:
@@ -42,7 +43,7 @@ def evaluate_refusal_accuracy(unanswerable_entries: list[dict[str, Any]], answer
     if not unanswerable_entries:
         return 1.0
     correct = 0
-    for q, ans in zip(unanswerable_entries, answers, strict=False):
+    for _q, ans in zip(unanswerable_entries, answers, strict=False):
         if is_refusal(ans) or NO_ANSWER in ans or "bulunamadı" in ans.lower() or "not found" in ans.lower():
             correct += 1
     return correct / len(unanswerable_entries)
