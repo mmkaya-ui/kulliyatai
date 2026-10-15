@@ -32,3 +32,12 @@ coverage.xml
 
 # Virtual Environment
 venv
+.venv/
+
+# Private corpus (copyrighted, not redistributable) — keep locally only
+my_pdfs/
+
+# Generated artifacts (rebuild with `make ingest`)
+vector_db/
+evals/.cache/
+.ruff_cache/
