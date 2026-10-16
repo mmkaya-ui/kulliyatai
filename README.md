@@ -203,7 +203,9 @@ Verified while preparing this version, on Linux with Python 3.11 and 3.13:
 - a fresh clone installed from `requirements.lock` into a new Python 3.11 environment: lint, the full
   test suite including the model tests, corpus and report checks, `ingest.py`, and a running
   `streamlit run app.py` answering its health check;
-- byte-identical corpus rebuild; git-history audit.
+- byte-identical corpus rebuild; git-history audit;
+- the GitHub Actions workflow (lint, unit tests, corpus and report checks), which
+  passed on the pull request that introduced this version.
 
 Not verified, so treat these as untested:
 
@@ -212,8 +214,6 @@ Not verified, so treat these as untested:
   path is unit-tested with a stub model only;
 - the **Docker image**: the Dockerfile was not built, because no container registry was reachable
   from the build environment;
-- the **GitHub Actions workflow**: its steps were run locally, but the workflow itself runs only
-  after a push;
 - **OCR on Windows**: OCR is tested on Linux with Tesseract 5.3.
 
 ## Limitations
