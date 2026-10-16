@@ -1,87 +1,90 @@
-"""Evaluation metric functions: Hit@K, MRR, Citation Correctness, and Refusal Accuracy."""
+"""Retrieval / abstention / extraction metrics and the statistics used to report them.
+
+Relevance is evidence-based (see :mod:`evals.dataset`): a retrieved chunk is
+relevant if it contains at least half of one of the item's evidence spans.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+import math
+from collections.abc import Sequence
 
+import numpy as np
 from langchain_core.documents import Document
 
-from rag.chunking import strip_context_header
-from rag.prompts import NO_ANSWER, is_refusal, split_claims
+from evals.dataset import DocText, EvalItem, Span, chunk_span, covers
+
+KS = (1, 3, 5)
+MRR_DEPTH = 10
 
 
-def doc_matches(doc: Document, expected_doc: str, expected_pages: list[int]) -> bool:
-    """Check if a retrieved Document matches the expected source filename and page."""
-    source = doc.metadata.get("source", "")
-    page = doc.metadata.get("page")
-    if source != expected_doc:
-        return False
-    if not expected_pages:
-        return True
-    return page in expected_pages
+def relevance_vector(chunks: list[Document], item: EvalItem, docs: dict[str, DocText]) -> list[bool]:
+    spans = [chunk_span(c, docs) for c in chunks]
+    return [any(covers(cs, ev) for ev in item.spans) for cs in spans]
 
 
-def hit_at_k(retrieved_docs: list[Document], expected_doc: str, expected_pages: list[int], k: int) -> float:
-    """Return 1.0 if any of the top-k retrieved docs matches the target doc & page, else 0.0."""
-    candidates = retrieved_docs[:k]
-    for doc in candidates:
-        if doc_matches(doc, expected_doc, expected_pages):
-            return 1.0
-    return 0.0
+def query_metrics(chunks: list[Document], item: EvalItem, docs: dict[str, DocText]) -> dict[str, float]:
+    rel = relevance_vector(chunks, item, docs)
+    out = {f"hit@{k}": float(any(rel[:k])) for k in KS}
+    first = next((i for i, r in enumerate(rel[:MRR_DEPTH], start=1) if r), None)
+    out["mrr@10"] = 1.0 / first if first else 0.0
+    spans5 = [chunk_span(c, docs) for c in chunks[:5]]
+    out["evidence_recall@5"] = sum(any(covers(cs, ev) for cs in spans5) for ev in item.spans) / len(item.spans)
+    pages = {(c.metadata.get("source"), c.metadata.get("page")) for c in chunks[:5]}
+    out["page_hit@5"] = float(any((item.doc, p) in pages for p in item.pages))
+    return out
 
 
-def reciprocal_rank(retrieved_docs: list[Document], expected_doc: str, expected_pages: list[int]) -> float:
-    """Compute Reciprocal Rank (1 / rank) for the first relevant retrieved document."""
-    for rank, doc in enumerate(retrieved_docs, start=1):
-        if doc_matches(doc, expected_doc, expected_pages):
-            return 1.0 / rank
-    return 0.0
+def sentence_hits_evidence(sent_span: Span, item: EvalItem) -> bool:
+    """A sentence supports the answer if it overlaps an evidence span substantially.
 
-
-def evaluate_refusal_accuracy(unanswerable_entries: list[dict[str, Any]], answers: list[str]) -> float:
-    """Check what fraction of unanswerable questions triggered a proper refusal."""
-    if not unanswerable_entries:
-        return 1.0
-    correct = 0
-    for _q, ans in zip(unanswerable_entries, answers, strict=False):
-        if is_refusal(ans) or NO_ANSWER in ans or "bulunamadı" in ans.lower() or "not found" in ans.lower():
-            correct += 1
-    return correct / len(unanswerable_entries)
-
-
-def evaluate_citation_correctness_heuristic(answer: str, source_docs: list[Document]) -> dict[str, Any]:
-    """Evaluate citation accuracy without calling an external LLM.
-
-    Checks:
-    1. Are cited indices within range [1..len(source_docs)]?
-    2. Does the cited source chunk contain key terms / n-grams from the citing claim?
+    Overlap must reach half of the shorter of the two (a short evidence quote
+    inside a long sentence counts, and so does a sentence inside a long quote).
     """
-    claims = split_claims(answer)
-    total_citations = 0
-    supported_citations = 0
-    hallucinated_indices = 0
+    for ev in item.spans:
+        if ev.doc != sent_span.doc:
+            continue
+        overlap = min(ev.end, sent_span.end) - max(ev.start, sent_span.start)
+        if overlap >= 0.5 * min(ev.end - ev.start, sent_span.end - sent_span.start):
+            return True
+    return False
 
-    doc_texts = {i: strip_context_header(d.page_content).lower() for i, d in enumerate(source_docs, start=1)}
 
-    for claim_text, cite_nums in claims:
-        for num in cite_nums:
-            total_citations += 1
-            if num not in doc_texts:
-                hallucinated_indices += 1
-                continue
+# --- statistics -------------------------------------------------------------
 
-            doc_text = doc_texts[num]
-            # Extract content words from claim (length > 3)
-            claim_words = [w.lower().strip(".,;:?!'\"()[]") for w in claim_text.split() if len(w) > 3]
-            overlap = [w for w in claim_words if w in doc_text]
-            # If at least 30% of significant claim words appear in the cited chunk:
-            if len(overlap) >= max(1, int(len(claim_words) * 0.25)):
-                supported_citations += 1
 
-    accuracy = (supported_citations / total_citations) if total_citations > 0 else 1.0
-    return {
-        "total_citations": total_citations,
-        "supported_citations": supported_citations,
-        "hallucinated_indices": hallucinated_indices,
-        "accuracy": accuracy,
-    }
+def mean_ci(values: Sequence[float], n_boot: int = 10_000, seed: int = 0, alpha: float = 0.05):
+    """Mean and percentile-bootstrap (1-alpha) CI over queries."""
+    v = np.asarray(values, dtype=float)
+    if len(v) == 0:
+        return {"mean": math.nan, "lo": math.nan, "hi": math.nan, "n": 0}
+    rng = np.random.default_rng(seed)
+    boots = v[rng.integers(0, len(v), size=(n_boot, len(v)))].mean(axis=1)
+    lo, hi = np.quantile(boots, [alpha / 2, 1 - alpha / 2])
+    return {"mean": float(v.mean()), "lo": float(lo), "hi": float(hi), "n": int(len(v))}
+
+
+def paired_permutation_test(a: Sequence[float], b: Sequence[float], n_perm: int = 10_000, seed: int = 0):
+    """Two-sided paired randomization (sign-flip) test on per-query differences a-b."""
+    d = np.asarray(a, dtype=float) - np.asarray(b, dtype=float)
+    if len(d) == 0 or not np.any(d):
+        return {"mean_diff": float(d.mean()) if len(d) else 0.0, "p_value": 1.0, "n": int(len(d))}
+    rng = np.random.default_rng(seed)
+    signs = rng.choice([-1.0, 1.0], size=(n_perm, len(d)))
+    null = np.abs((signs * d).mean(axis=1))
+    p = (np.sum(null >= abs(d.mean()) - 1e-12) + 1) / (n_perm + 1)
+    return {"mean_diff": float(d.mean()), "p_value": float(p), "n": int(len(d))}
+
+
+def auroc(pos: Sequence[float], neg: Sequence[float]) -> float:
+    """P(score of a random positive > score of a random negative), ties count 1/2."""
+    pos, neg = np.asarray(pos, dtype=float), np.asarray(neg, dtype=float)
+    if len(pos) == 0 or len(neg) == 0:
+        return math.nan
+    gt = (pos[:, None] > neg[None, :]).sum()
+    eq = (pos[:, None] == neg[None, :]).sum()
+    return float((gt + 0.5 * eq) / (len(pos) * len(neg)))
+
+
+def percentile(values: Sequence[float], q: float) -> float:
+    return float(np.percentile(np.asarray(values, dtype=float), q)) if len(values) else math.nan

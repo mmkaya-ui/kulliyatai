@@ -1,0 +1,73 @@
+{
+  "font": {
+    "file": "scripts/fonts/DejaVuSans.ttf",
+    "sha256": "ae7b7855e115a5966d8b1b3f80f254ccc117ec86f9965e202ee2940453837280"
+  },
+  "documents": [
+    {
+      "file": "tr_teskilati_esasiye_1924.pdf",
+      "title": "Teşkîlât-ı Esâsîye Kanunu (1924)",
+      "language": "tr",
+      "work": "Teşkîlât-ı Esâsîye Kanunu (Constitution of Turkey, 1924), amended text",
+      "upstream": "https://tr.wikisource.org/wiki/Te%C5%9Fk%C3%AEl%C3%A2t-%C4%B1_Es%C3%A2s%C3%AEye_Kanunu_(1924)",
+      "public_domain_basis": "Officially published legislation; Turkish copyright law (FSEK) makes its reproduction and distribution free ('Resmen yayımlanan veya ilân olunan mevzuat ve kararların çoğaltılması, yayılması ... serbesttir').",
+      "derived_from": "Recovered losslessly (word-for-word) from the v1 PDFs of git commit 5770964 by scripts/legacy/recover_sources_from_v1_pdfs.py; v1 itself was downloaded from 'upstream'. HTML entities and wiki ':' indentation were removed from the Seyfettin text.",
+      "pages": 8,
+      "chars": 21359,
+      "source_sha256": "5ae1f97c8b0124d981782d6e49ef22fb49a2072841109ad588e2da0cd877ea1e",
+      "pdf_sha256": "eb8ac963a2ac695c8e67a4440c2b87b1bd23911128cf146374ad371f85974ef7"
+    },
+    {
+      "file": "tr_omer_seyfettin_hikayeler.pdf",
+      "title": "Ömer Seyfettin — Hikâyeler",
+      "language": "tr",
+      "work": "Ömer Seyfettin, 'Kaşağı' and 'Başını Vermeyen Şehit'",
+      "upstream": "https://tr.wikisource.org/wiki/Ka%C5%9Fa%C4%9F%C4%B1",
+      "public_domain_basis": "Author died 1920; public domain (life + 70 years).",
+      "derived_from": "Recovered losslessly (word-for-word) from the v1 PDFs of git commit 5770964 by scripts/legacy/recover_sources_from_v1_pdfs.py; v1 itself was downloaded from 'upstream'. HTML entities and wiki ':' indentation were removed from the Seyfettin text.",
+      "pages": 9,
+      "chars": 23744,
+      "source_sha256": "5becca94c28fb28325d29a3c57a4445f3d22e875c3829889d4f81b894fd9de8a",
+      "pdf_sha256": "5fddebb7608f3773bfe9f285d13798d3c87e6a992f2fea7cf4496b033b0e0321"
+    },
+    {
+      "file": "en_us_constitution.pdf",
+      "title": "The Constitution of the United States (1787)",
+      "language": "en",
+      "work": "The Constitution of the United States (1787 text, no amendments)",
+      "upstream": "https://www.gutenberg.org/ebooks/5",
+      "public_domain_basis": "Public-domain U.S. founding document.",
+      "derived_from": "Recovered losslessly (word-for-word) from the v1 PDFs of git commit 5770964 by scripts/legacy/recover_sources_from_v1_pdfs.py; v1 itself was downloaded from 'upstream'. HTML entities and wiki ':' indentation were removed from the Seyfettin text.",
+      "pages": 10,
+      "chars": 26733,
+      "source_sha256": "1d3b73fc2ca61e693d66212be1adc0de8888d15f72623229de517ceeb71378ad",
+      "pdf_sha256": "ec4ecef7fff50672b503014d1b34d7959dc6eceec0fff4f461ee7e493a5ee471"
+    },
+    {
+      "file": "en_scandal_in_bohemia.pdf",
+      "title": "A Scandal in Bohemia — Arthur Conan Doyle",
+      "language": "en",
+      "work": "Arthur Conan Doyle, 'A Scandal in Bohemia' (1891)",
+      "upstream": "https://www.gutenberg.org/ebooks/1661",
+      "public_domain_basis": "Author died 1930; public domain (life + 70 years).",
+      "derived_from": "Recovered losslessly (word-for-word) from the v1 PDFs of git commit 5770964 by scripts/legacy/recover_sources_from_v1_pdfs.py; v1 itself was downloaded from 'upstream'. HTML entities and wiki ':' indentation were removed from the Seyfettin text.",
+      "pages": 18,
+      "chars": 46401,
+      "source_sha256": "ab98ff73be76f30edb7a2039189a41ff20dfa96b997683f42c2ebde544e610c5",
+      "pdf_sha256": "9db5326b534f53bac6b5149691b1306f43423339f0f25bbe47cb977c2fef4983"
+    },
+    {
+      "file": "de_kafka_die_verwandlung.pdf",
+      "title": "Die Verwandlung — Franz Kafka",
+      "language": "de",
+      "work": "Franz Kafka, 'Die Verwandlung' (1915)",
+      "upstream": "https://www.gutenberg.org/ebooks/22367",
+      "public_domain_basis": "Author died 1924; public domain (life + 70 years).",
+      "derived_from": "Recovered losslessly (word-for-word) from the v1 PDFs of git commit 5770964 by scripts/legacy/recover_sources_from_v1_pdfs.py; v1 itself was downloaded from 'upstream'. HTML entities and wiki ':' indentation were removed from the Seyfettin text.",
+      "pages": 33,
+      "chars": 121125,
+      "source_sha256": "3e74f3201c3836bad7adfbd2f838e878559cc44ff6ef1341db4420f1b460f9dc",
+      "pdf_sha256": "7de63ea557cb0eac4a1dd71f2c55460ead55715cb1672eccbf52ad4102ef785f"
+    }
+  ]
+}

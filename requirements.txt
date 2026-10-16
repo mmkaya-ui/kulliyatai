@@ -1,36 +1,28 @@
-# Core App & Web UI
+# Runtime dependencies (pinned). Fully resolved, cross-platform lock: requirements.lock
+# Web UI
 streamlit==1.54.0
 
-# Document Ingestion & Text Splitting
+# PDF parsing, chunking
 PyMuPDF==1.27.1
+langchain-core==1.2.11
 langchain-text-splitters==1.1.0
 
-# Vector Store & Search
+# Retrieval
 faiss-cpu==1.13.2
 rank-bm25==0.2.2
-
-# Embeddings & Inference (Local, CPU-friendly ONNX)
-fastembed==0.9.0
-onnxruntime==1.31.0
 numpy==2.4.2
 
-# LangChain Orchestration
-langchain-core==1.2.11
-langchain-community==0.4.1
-langchain-classic==1.0.1
-pydantic==2.14.1
+# Local ONNX embeddings + cross-encoder reranker (CPU)
+fastembed==0.9.0
+onnxruntime==1.31.0
+tokenizers==0.23.3
 
-# Optional Provider SDKs (for OpenAI / Gemini / OpenRouter models)
+# Optional cloud providers (only needed for the LLM answer modes / cloud embeddings)
 openai==2.20.0
 google-genai==1.75.0
 langchain-openai==1.1.9
 langchain-google-genai==4.2.0
-tiktoken==0.14.0
 
 # Utilities
 python-dotenv==1.2.1
 fpdf2==2.8.7
-
-# Testing & Linting (Dev)
-pytest==9.1.1
-ruff==0.17.0

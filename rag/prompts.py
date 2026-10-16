@@ -1,4 +1,4 @@
-"""Prompt building, citation parsing and refusal detection."""
+"""LLM prompt building, citation parsing and refusal detection."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from langchain_core.documents import Document
 from rag.chunking import strip_context_header
 
 # The model must output exactly this token when the context has no answer.
-# A fixed sentinel is language-independent and easy to detect in evals; the
-# UI replaces it with a localised message (see REFUSAL_MESSAGES).
+# A fixed sentinel is language-independent and easy to detect; the UI replaces
+# it with a localised message (see REFUSAL_MESSAGES).
 NO_ANSWER = "NO_ANSWER"
 
 REFUSAL_MESSAGES = {
@@ -26,8 +26,6 @@ LANGUAGE_INSTRUCTIONS = {
     "de": "Cevabını Almanca ver.",
 }
 
-# Modern RAG prompt template (original Turkish wording kept; rules added for
-# grounded citations, refusals and prompt-injection resistance).
 RAG_PROMPT_TEMPLATE = """Sen bir külliyat asistanısın. Aşağıdaki bağlam bilgilerini kullanarak soruyu detaylı ve doğru şekilde yanıtla.
 {language_instruction}
 
@@ -48,7 +46,7 @@ _CITATION_RE = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 
 
 def format_docs(docs: list[Document]) -> str:
-    """Number the chunks so the model can cite them as [1], [2], …"""
+    """Number the passages so the model can cite them as [1], [2], …"""
     blocks = []
     for i, doc in enumerate(docs, start=1):
         source = doc.metadata.get("source", "Bilinmeyen Dosya")
@@ -69,10 +67,9 @@ def build_prompt(question: str, docs: list[Document], language: str = "tr") -> s
 
 
 def parse_citations(answer: str, n_docs: int | None = None) -> list[int]:
-    """Return the sorted unique 1-based source numbers cited in ``answer``.
+    """Sorted unique 1-based source numbers cited in ``answer`` (``[1]``, ``[1][2]``, ``[1, 2]``).
 
-    Handles ``[1]``, ``[1][2]`` and ``[1, 2]``. Numbers outside ``1..n_docs``
-    are dropped (hallucinated citations).
+    With ``n_docs``, numbers outside ``1..n_docs`` (hallucinated citations) are dropped.
     """
     nums = {int(n) for group in _CITATION_RE.findall(answer) for n in group.split(",")}
     if n_docs is not None:
@@ -80,22 +77,21 @@ def parse_citations(answer: str, n_docs: int | None = None) -> list[int]:
     return sorted(nums)
 
 
+def invalid_citations(answer: str, n_docs: int) -> list[int]:
+    """Citation numbers that point to no passage."""
+    return sorted(set(parse_citations(answer)) - set(parse_citations(answer, n_docs)))
+
+
 def is_refusal(answer: str) -> bool:
     return NO_ANSWER in answer
 
 
 def split_claims(answer: str) -> list[tuple[str, list[int]]]:
-    """Split an answer into sentences and the citation numbers attached to each.
-
-    Used by the citation-correctness eval: each (sentence, cited sources)
-    pair is checked against the cited chunks.
-    """
+    """Split an answer into sentences and the citation numbers attached to each."""
     sentences = re.split(r"(?<=[.!?…])\s+|\n+", answer.strip())
     out = []
     for s in sentences:
         s = s.strip(" -*•\t")
-        if not s:
-            continue
-        cites = parse_citations(s)
-        out.append((s, cites))
+        if s:
+            out.append((s, parse_citations(s)))
     return out
