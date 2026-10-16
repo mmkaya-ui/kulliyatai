@@ -198,8 +198,11 @@ Verified while preparing this version, on Linux with Python 3.11 and 3.13:
 
 - the test suite, including the end-to-end tests with the real models (`RUN_MODEL_TESTS=1`): ingest,
   retrieval with reranking, and the Streamlit app answering and refusing through `streamlit.testing`;
-- the full benchmark run that produced `results.json`;
-- a clean install from `requirements.lock` in a fresh Python 3.11 environment, then lint and tests;
+- the full benchmark run that produced `results.json`, run twice: the quality metrics were identical,
+  only latencies varied;
+- a fresh clone installed from `requirements.lock` into a new Python 3.11 environment: lint, the full
+  test suite including the model tests, corpus and report checks, `ingest.py`, and a running
+  `streamlit run app.py` answering its health check;
 - byte-identical corpus rebuild; git-history audit.
 
 Not verified, so treat these as untested:
