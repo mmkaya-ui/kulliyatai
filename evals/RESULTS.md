@@ -9,17 +9,17 @@
 - **Relevance:** chunk contains >= 50% of an evidence span. Metrics use the top 10 results.
 - **Models:** embedder `fastembed/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`, reranker `BAAI/bge-reranker-v2-m3-int8` (both local ONNX via FastEmbed).
 - **Protocol:** all settings selected on **dev** by mrr@10 (ties: hit@5); all numbers below are **test** unless stated. 95% CIs: percentile bootstrap over questions (10,000 resamples). p-values: two-sided paired sign-flip permutation test (10,000 resamples). RRF: k = 60, weights [1.0, 1.0].
-- **Machine:** Intel(R) Xeon(R) Processor @ 2.10GHz, 2 threads, Python 3.13.16, Linux-6.18.44-fc-v139-x86_64-with-glibc2.39. Run time 1,102 s. Git commit `af736814aee7` (uncommitted changes).
+- **Machine:** Intel(R) Xeon(R) Processor @ 2.10GHz, 2 threads, Python 3.13.16, Linux-6.18.44-fc-v139-x86_64-with-glibc2.39. Run time 1,106 s. Git commit `fd0dfb78b435`.
 
 ## Main results
 
 | System (test split) | Hit@1 | Hit@3 | Hit@5 | MRR@10 | Evidence recall@5 | Latency median / p95 |
 |---|---|---|---|---|---|---|
-| **BM25** | 0.460 <sub>[0.33, 0.59]</sub> | 0.651 <sub>[0.54, 0.76]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.559 <sub>[0.45, 0.66]</sub> | 0.667 <sub>[0.56, 0.78]</sub> | 0.6 ms / 0.9 ms |
-| **Dense** | 0.460 <sub>[0.35, 0.59]</sub> | 0.635 <sub>[0.51, 0.75]</sub> | 0.683 <sub>[0.57, 0.79]</sub> | 0.562 <sub>[0.46, 0.67]</sub> | 0.643 <sub>[0.53, 0.75]</sub> | 7.6 ms / 10.6 ms |
-| **Hybrid (RRF)** | 0.429 <sub>[0.30, 0.56]</sub> | 0.556 <sub>[0.43, 0.68]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.539 <sub>[0.44, 0.64]</sub> | 0.683 <sub>[0.56, 0.79]</sub> | 9.9 ms / 14.8 ms |
+| **BM25** | 0.460 <sub>[0.33, 0.59]</sub> | 0.651 <sub>[0.54, 0.76]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.559 <sub>[0.45, 0.66]</sub> | 0.667 <sub>[0.56, 0.78]</sub> | 0.6 ms / 0.8 ms |
+| **Dense** | 0.460 <sub>[0.35, 0.59]</sub> | 0.635 <sub>[0.51, 0.75]</sub> | 0.683 <sub>[0.57, 0.79]</sub> | 0.562 <sub>[0.46, 0.67]</sub> | 0.643 <sub>[0.53, 0.75]</sub> | 7.0 ms / 11.0 ms |
+| **Hybrid (RRF)** | 0.429 <sub>[0.30, 0.56]</sub> | 0.556 <sub>[0.43, 0.68]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.539 <sub>[0.44, 0.64]</sub> | 0.683 <sub>[0.56, 0.79]</sub> | 7.2 ms / 10.3 ms |
 | **Pre-v2 settings (hybrid)** | 0.270 <sub>[0.16, 0.38]</sub> | 0.508 <sub>[0.38, 0.63]</sub> | 0.587 <sub>[0.46, 0.70]</sub> | 0.410 <sub>[0.31, 0.51]</sub> | 0.548 <sub>[0.43, 0.67]</sub> | – |
-| **Hybrid + rerank** | 0.794 <sub>[0.70, 0.89]</sub> | 0.873 <sub>[0.79, 0.95]</sub> | 0.889 <sub>[0.81, 0.95]</sub> | 0.837 <sub>[0.75, 0.92]</sub> | 0.873 <sub>[0.79, 0.94]</sub> | 8,699 ms / 10,311 ms |
+| **Hybrid + rerank** | 0.794 <sub>[0.70, 0.89]</sub> | 0.873 <sub>[0.79, 0.95]</sub> | 0.889 <sub>[0.81, 0.95]</sub> | 0.837 <sub>[0.75, 0.92]</sub> | 0.873 <sub>[0.79, 0.94]</sub> | 8,923 ms / 10,648 ms |
 
 Selected settings (dev):
 
@@ -37,7 +37,7 @@ Selected settings (dev):
 - Hybrid (RRF) vs BM25: MRR@10 -0.020, paired permutation p = 0.717 (not significant at α = 0.05).
 - Hybrid (RRF) vs Dense: MRR@10 -0.024, paired permutation p = 0.581 (not significant at α = 0.05).
 - Largest single-factor effect: *dense windows -> single vector* changes hybrid MRR@10 by -0.166 (p = 0.001).
-- Reranking costs 8,676 ms median per query on 2 CPU threads (Intel(R) Xeon(R) Processor @ 2.10GHz); the first stage takes 9.9 ms.
+- Reranking costs 8,901 ms median per query on 2 CPU threads (Intel(R) Xeon(R) Processor @ 2.10GHz); the first stage takes 7.2 ms.
 - Abstention gate (no LLM): keeps 95.2% <sub>[89, 100]</sub> of answerable and refuses 46.2% <sub>[23, 77]</sub> of unanswerable test questions (n = 13 unanswerable; AUROC 0.91).
 
 ## Significance (test, paired)
@@ -96,26 +96,26 @@ Latency measured on the first 16 answerable test questions with an uncached mode
 
 | Candidates | MRR@10 | Hit@1 | Median latency | p95 latency |
 |---|---|---|---|---|
-| 10 | 0.784 <sub>[0.68, 0.88]</sub> | 0.746 <sub>[0.63, 0.86]</sub> | 3,417 ms | 3,646 ms |
-| 20 | 0.820 <sub>[0.73, 0.90]</sub> | 0.778 <sub>[0.67, 0.87]</sub> | 6,461 ms | 6,952 ms |
-| 30 | 0.837 <sub>[0.75, 0.92]</sub> | 0.794 <sub>[0.70, 0.89]</sub> | 9,961 ms | 10,321 ms |
+| 10 | 0.784 <sub>[0.68, 0.88]</sub> | 0.746 <sub>[0.63, 0.86]</sub> | 3,361 ms | 3,509 ms |
+| 20 | 0.820 <sub>[0.73, 0.90]</sub> | 0.778 <sub>[0.67, 0.87]</sub> | 6,404 ms | 6,810 ms |
+| 30 | 0.837 <sub>[0.75, 0.92]</sub> | 0.794 <sub>[0.70, 0.89]</sub> | 9,604 ms | 10,329 ms |
 
 ## Latency by stage (test, uncached, after warm-up)
 
 | System | Stage | Median | p95 |
 |---|---|---|---|
-| BM25 | bm25 | 0.6 ms | 0.9 ms |
-| Dense | embed_query | 7.5 ms | 10.4 ms |
+| BM25 | bm25 | 0.6 ms | 0.8 ms |
+| Dense | embed_query | 6.8 ms | 10.8 ms |
 | Dense | dense_search | 0.1 ms | 0.2 ms |
-| Hybrid (RRF) | embed_query | 8.6 ms | 13.7 ms |
-| Hybrid (RRF) | dense_search | 0.2 ms | 0.2 ms |
-| Hybrid (RRF) | bm25 | 0.9 ms | 1.7 ms |
-| Hybrid (RRF) | fusion | 0.0 ms | 0.1 ms |
-| Hybrid + rerank | embed_query | 17.5 ms | 24.9 ms |
+| Hybrid (RRF) | embed_query | 6.3 ms | 9.1 ms |
+| Hybrid (RRF) | dense_search | 0.1 ms | 0.2 ms |
+| Hybrid (RRF) | bm25 | 0.8 ms | 1.1 ms |
+| Hybrid (RRF) | fusion | 0.0 ms | 0.0 ms |
+| Hybrid + rerank | embed_query | 19.1 ms | 26.5 ms |
 | Hybrid + rerank | dense_search | 0.3 ms | 0.4 ms |
-| Hybrid + rerank | bm25 | 1.1 ms | 1.8 ms |
+| Hybrid + rerank | bm25 | 1.2 ms | 1.7 ms |
 | Hybrid + rerank | fusion | 0.1 ms | 0.1 ms |
-| Hybrid + rerank | rerank | 8,676 ms | 10,290 ms |
+| Hybrid + rerank | rerank | 8,901 ms | 10,629 ms |
 
 ## Abstention without an LLM (test)
 
@@ -172,9 +172,9 @@ Reranker candidates on dev: 10 → MRR@10 0.745, 20 → MRR@10 0.804, 30 → MRR
 | Settings | Chunks | Dense units | Chunks truncated by the embedder |
 |---|---|---|---|
 | chunk 1000/150, header off, dense single, bm25 prefix5 | 314 | 314 | 266 |
+| chunk 1500/300, header on, dense single, bm25 plain | 214 | 214 | 206 |
 | chunk 1500/225, header on, dense windows, bm25 plain | 209 | 1241 | 0 |
 | chunk 1000/150, header on, dense windows, bm25 prefix5 | 314 | 1177 | 0 |
-| chunk 1500/300, header on, dense single, bm25 plain | 214 | 214 | 206 |
 
 ## Reproduce
 

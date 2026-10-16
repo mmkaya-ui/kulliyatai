@@ -58,11 +58,11 @@ Test split: 63 answerable + 13 unanswerable questions (settings chosen on a sepa
 
 | System (test split) | Hit@1 | Hit@3 | Hit@5 | MRR@10 | Evidence recall@5 | Latency median / p95 |
 |---|---|---|---|---|---|---|
-| **BM25** | 0.460 <sub>[0.33, 0.59]</sub> | 0.651 <sub>[0.54, 0.76]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.559 <sub>[0.45, 0.66]</sub> | 0.667 <sub>[0.56, 0.78]</sub> | 0.6 ms / 0.9 ms |
-| **Dense** | 0.460 <sub>[0.35, 0.59]</sub> | 0.635 <sub>[0.51, 0.75]</sub> | 0.683 <sub>[0.57, 0.79]</sub> | 0.562 <sub>[0.46, 0.67]</sub> | 0.643 <sub>[0.53, 0.75]</sub> | 7.6 ms / 10.6 ms |
-| **Hybrid (RRF)** | 0.429 <sub>[0.30, 0.56]</sub> | 0.556 <sub>[0.43, 0.68]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.539 <sub>[0.44, 0.64]</sub> | 0.683 <sub>[0.56, 0.79]</sub> | 9.9 ms / 14.8 ms |
+| **BM25** | 0.460 <sub>[0.33, 0.59]</sub> | 0.651 <sub>[0.54, 0.76]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.559 <sub>[0.45, 0.66]</sub> | 0.667 <sub>[0.56, 0.78]</sub> | 0.6 ms / 0.8 ms |
+| **Dense** | 0.460 <sub>[0.35, 0.59]</sub> | 0.635 <sub>[0.51, 0.75]</sub> | 0.683 <sub>[0.57, 0.79]</sub> | 0.562 <sub>[0.46, 0.67]</sub> | 0.643 <sub>[0.53, 0.75]</sub> | 7.0 ms / 11.0 ms |
+| **Hybrid (RRF)** | 0.429 <sub>[0.30, 0.56]</sub> | 0.556 <sub>[0.43, 0.68]</sub> | 0.698 <sub>[0.59, 0.81]</sub> | 0.539 <sub>[0.44, 0.64]</sub> | 0.683 <sub>[0.56, 0.79]</sub> | 7.2 ms / 10.3 ms |
 | **Pre-v2 settings (hybrid)** | 0.270 <sub>[0.16, 0.38]</sub> | 0.508 <sub>[0.38, 0.63]</sub> | 0.587 <sub>[0.46, 0.70]</sub> | 0.410 <sub>[0.31, 0.51]</sub> | 0.548 <sub>[0.43, 0.67]</sub> | – |
-| **Hybrid + rerank** | 0.794 <sub>[0.70, 0.89]</sub> | 0.873 <sub>[0.79, 0.95]</sub> | 0.889 <sub>[0.81, 0.95]</sub> | 0.837 <sub>[0.75, 0.92]</sub> | 0.873 <sub>[0.79, 0.94]</sub> | 8,699 ms / 10,311 ms |
+| **Hybrid + rerank** | 0.794 <sub>[0.70, 0.89]</sub> | 0.873 <sub>[0.79, 0.95]</sub> | 0.889 <sub>[0.81, 0.95]</sub> | 0.837 <sub>[0.75, 0.92]</sub> | 0.873 <sub>[0.79, 0.94]</sub> | 8,923 ms / 10,648 ms |
 
 - Best test MRR@10: **Hybrid + rerank** with 0.837 (95% CI 0.75–0.92).
 - Hybrid + rerank vs Hybrid (RRF): MRR@10 +0.298, paired permutation p < 0.001 (significant at α = 0.05).
@@ -70,7 +70,7 @@ Test split: 63 answerable + 13 unanswerable questions (settings chosen on a sepa
 - Hybrid (RRF) vs BM25: MRR@10 -0.020, paired permutation p = 0.717 (not significant at α = 0.05).
 - Hybrid (RRF) vs Dense: MRR@10 -0.024, paired permutation p = 0.581 (not significant at α = 0.05).
 - Largest single-factor effect: *dense windows -> single vector* changes hybrid MRR@10 by -0.166 (p = 0.001).
-- Reranking costs 8,676 ms median per query on 2 CPU threads (Intel(R) Xeon(R) Processor @ 2.10GHz); the first stage takes 9.9 ms.
+- Reranking costs 8,901 ms median per query on 2 CPU threads (Intel(R) Xeon(R) Processor @ 2.10GHz); the first stage takes 7.2 ms.
 - Abstention gate (no LLM): keeps 95.2% <sub>[89, 100]</sub> of answerable and refuses 46.2% <sub>[23, 77]</sub> of unanswerable test questions (n = 13 unanswerable; AUROC 0.91).
 
 Full tables (significance tests, per-language breakdown, ablations, latency per stage, dev grid): [`evals/RESULTS.md`](evals/RESULTS.md).
